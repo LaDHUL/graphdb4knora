@@ -1,0 +1,54 @@
+#
+# Dockerfile to start GraphDB
+# 
+#  We build an off-the shelf graphdb instance (it can be replaced by another anytime)
+#
+#  Download graphdb, let's say `graphdb-se-7.1.0-dist.zip` in the same directory as the Dockerfile
+#  Adapt this script to find your graphdb version:
+#    cat Dockerfile.prototype | sed 's#%GRAPHDB%#graphdb-se-7.1.0#' > Dockerfile
+#
+#  The data is in a local directory on the host %LOCAL_FS%, it is mounted like this: -v %LOCAL_FS%:/graphdb
+#  Adapt this Dockerfile with:
+#    cat Dockerfile | sed 's#%LOCAL_FS%#/my/data/dir#' > Dockerfile
+#
+#  We expect to find a licence file named `%LOCAL_FS%/graphdb.licence`
+#
+#  It is also the place to put `KnoraRules.pie` file
+# 
+#  Note: SELinux: if used, selinux has to allow the mount to be writeable by docker:
+#    sudo su -c "setenforce 0"
+#    sudo chcon -Rt svirt_sandbox_file_t <local fs>
+#    sudo su -c "setenforce 1"
+#    sudo mkdir -p <local fs>
+#
+# To build and run with Docker:
+#
+#  $ sudo docker build -t platec/knora-test-graphdb .
+#  $ sudo docker run -p <exposed port>:7200 -v <local fs>:/graphdb --name knora-test-graphdb -d platec/knora-test-graphdb
+#
+
+FROM centos
+
+# create user
+RUN useradd -s /sbin/nologin graphdb
+
+# install dependancies
+RUN yum install -y java-1.8.0-openjdk-devel
+RUN yum install -y unzip
+
+# install graphdb
+COPY %GRAPHDB%-dist.zip /home/graphdb/
+RUN cd /home/graphdb/ && unzip %GRAPHDB%-dist.zip
+
+# create the init script
+RUN echo '#!/bin/bash' > /home/graphdb/start
+RUN echo '/home/graphdb/%GRAPHDB%/bin/graphdb -Dgraphdb.license.file=/graphdb/graphdb.licence -Dgraphdb.home=/graphdb' >> /home/graphdb/start
+RUN chown graphdb.graphdb /home/graphdb/start
+RUN chmod +x /home/graphdb/start
+
+WORKDIR /home/graphdb
+
+USER graphdb
+
+EXPOSE 7200
+ENTRYPOINT ["/home/graphdb/start"] 
