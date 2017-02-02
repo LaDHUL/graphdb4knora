@@ -11,9 +11,10 @@
 #  Adapt this Dockerfile with:
 #    cat Dockerfile | sed 's#%LOCAL_FS%#/my/data/dir#' > Dockerfile
 #
-#  We expect to find a licence file named `%LOCAL_FS%/graphdb.licence`
-#
-#  It is also the place to put `KnoraRules.pie` file
+#  We expect to find there:
+#  - a license file named `%LOCAL_FS%/graphdb.license`
+#  - the latest rule file: `%LOCAL_FS%/KnoraRules.pie` 
+#  - a subdirectory to store data: `%LOCAL_FS%/graphdb`
 # 
 #  Note: SELinux: if used, selinux has to allow the mount to be writeable by docker:
 #    sudo su -c "setenforce 0"
@@ -42,7 +43,7 @@ RUN cd /home/graphdb/ && unzip %GRAPHDB%-dist.zip
 
 # create the init script
 RUN echo '#!/bin/bash' > /home/graphdb/start
-RUN echo '/home/graphdb/%GRAPHDB%/bin/graphdb -Dgraphdb.license.file=/graphdb/graphdb.licence -Dgraphdb.home=/graphdb' >> /home/graphdb/start
+RUN echo '/home/graphdb/%GRAPHDB%/bin/graphdb -Dgraphdb.license.file=/graphdb/graphdb.license -Dgraphdb.home=/graphdb/graphdb' >> /home/graphdb/start
 RUN chown graphdb.graphdb /home/graphdb/start
 RUN chmod +x /home/graphdb/start
 
