@@ -39,8 +39,20 @@ Consistency file is also to be copied there: `%LOCAL_FS%/KnoraRules.pie`
 
 # build and run
 
+by hand:
 ```
   $ sudo docker build -t platec/knora-test-graphdb .
   $ sudo docker run -p <exposed port>:7200 -v </my/data/dir>:/graphdb --name knora-test-graphdb -d platec/knora-test-graphdb
 ```
 
+but there is a `Makefile` to automate that.
+
+First change the variables in the header:
+```
+container=graphdb
+image=platec/knora-test-graphdb-0.5
+network=knora-test
+alias=$(container)
+```
+
+and then call `sudo make check|stop|rm|rmi|build|run|start`
