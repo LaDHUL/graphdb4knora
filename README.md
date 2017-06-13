@@ -5,15 +5,15 @@ We build an off-the shelf graphdb instance (it can be replaced by another anytim
 
 ## Download graphdb
 
-let's say `graphdb-se-8.0.3-dist.zip`, in the same directory as the Dockerfile.
-Adapt this script to find your graphdb version:
+Download, let's say `graphdb-se-8.0.3-dist.zip`, in the same directory as the Dockerfile.
+Adapt this script to match your graphdb version:
 ```sh
 cat Dockerfile.prototype | sed 's#%GRAPHDB%#graphdb-se-8.0.3#' > Dockerfile
 ```
 
 ## Local data
 
-We put only the graphdb code in the container, the rest in the host's file system.  
+We put only the graphdb code in the container, the rest is on the host's file system.  
 These items have different lifespan: _data_, _licence_, graphdb version, _consistency rules file_ ([KnoraRules.pie](https://github.com/dhlab-basel/Knora/blob/develop/webapi/scripts/KnoraRules.pie)).  
 So we expect to have on the host, a local folder like:
 
@@ -31,17 +31,16 @@ If missing:
 
 - `graphdb.license`  can be missing, it will generate an error in the log, but graphdb will work without a license
 
-  ​
 
-This local folder (i.e. `/my/data/dir`) is mounted with this docker arguments: `-v /my/data/dir:/graphdb`. 
+This local folder (f.e. `/my/data/dir`) is mounted with this docker arguments: `-v /my/data/dir:/graphdb`. 
 
 ### Note about SELinux
 
 ```
   $ sudo su -c "setenforce 0"
-  $ sudo chcon -Rt svirt_sandbox_file_t </my/data/dir>
+  $ sudo chcon -Rt svirt_sandbox_file_t /my/data/dir
   $ sudo su -c "setenforce 1"
-  $ sudo mkdir -p </my/data/dir>
+  $ sudo mkdir -p /my/data/dir
 ```
 
 # build and run
@@ -50,6 +49,7 @@ This local folder (i.e. `/my/data/dir`) is mounted with this docker arguments: `
   $ sudo docker build -t graphdb-image .
   $ sudo docker run -p <exposed port>:7200 -v </my/data/dir>:/graphdb --name graphdb-container -d graphdb-image
 ```
+
 To ease the release (and roll-back) process, it is recommended to version images and containers, for exemple:
 
 ```sh
@@ -63,3 +63,14 @@ To match the rights of the local files and the user graphdb runs as in the conta
 $ sudo docker run -p 7200>:7200 -v /my/data/dir:/graphdb --name graphdb-20170613 -d knora/graphdb:dev-20170613 `id -u dbuser` `id -g dbuser`
 ```
 
+It is also recommended to add that to a `Makefile`.
+
+First change the variables in the header:
+```
+container=graphdb-20170613
+image=knora/graphdb:dev-20170613
+network=knora-test
+alias=graphdb
+```
+
+and then call `sudo make check|stop|rm|rmi|build|run|start`
