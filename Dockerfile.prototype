@@ -1,54 +1,63 @@
 #
-# Dockerfile to start GraphDB
+# Dockerfile for GraphDB
 # 
-#  We build an off-the shelf graphdb instance (it can be replaced by another anytime)
-#
-#  Download graphdb, let's say `graphdb-se-7.1.0-dist.zip` in the same directory as the Dockerfile
-#  Adapt this script to find your graphdb version:
-#    cat Dockerfile.prototype | sed 's#%GRAPHDB%#graphdb-se-7.1.0#' > Dockerfile
-#
-#  The data is in a local directory on the host %LOCAL_FS%, it is mounted like this: -v %LOCAL_FS%:/graphdb
-#  Adapt this Dockerfile with:
-#    cat Dockerfile | sed 's#%LOCAL_FS%#/my/data/dir#' > Dockerfile
-#
-#  We expect to find a licence file named `%LOCAL_FS%/graphdb.licence`
-#
-#  It is also the place to put `KnoraRules.pie` file
-# 
-#  Note: SELinux: if used, selinux has to allow the mount to be writeable by docker:
-#    sudo su -c "setenforce 0"
-#    sudo chcon -Rt svirt_sandbox_file_t <local fs>
-#    sudo su -c "setenforce 1"
-#    sudo mkdir -p <local fs>
-#
-# To build and run with Docker:
-#
-#  $ sudo docker build -t platec/knora-test-graphdb .
-#  $ sudo docker run -p <exposed port>:7200 -v <local fs>:/graphdb --name knora-test-graphdb -d platec/knora-test-graphdb
+# Please read README.md for details and instructions
 #
 
-FROM centos
+FROM ubuntu:16.04
+
+# grab gosu for easy step-down from root
+#   advertised by https://docs.docker.com/engine/userguide/eng-image/dockerfile_best-practices/#entrypoint
+#   copied from: https://github.com/docker-library/postgres/blob/master/9.6/Dockerfile
+ENV GOSU_VERSION 1.7
+RUN set -x \
+	&& apt-get update && apt-get install -y --no-install-recommends ca-certificates wget && rm -rf /var/lib/apt/lists/* \
+	&& wget -O /usr/local/bin/gosu "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$(dpkg --print-architecture)" \
+	&& wget -O /usr/local/bin/gosu.asc "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$(dpkg --print-architecture).asc" \
+	&& export GNUPGHOME="$(mktemp -d)" \
+	&& gpg --keyserver ha.pool.sks-keyservers.net --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4 \
+	&& gpg --batch --verify /usr/local/bin/gosu.asc /usr/local/bin/gosu \
+	&& rm -r "$GNUPGHOME" /usr/local/bin/gosu.asc \
+	&& chmod +x /usr/local/bin/gosu \
+	&& gosu nobody true \
+	&& apt-get purge -y --auto-remove ca-certificates wget
+
+
+# install dependancies
+RUN set -x \
+        && apt-get update \
+	&& apt-get install -y \
+		openjdk-8-jdk \
+		unzip
 
 # create user
 RUN useradd -s /sbin/nologin graphdb
-
-# install dependancies
-RUN yum install -y java-1.8.0-openjdk-devel
-RUN yum install -y unzip
 
 # install graphdb
 COPY %GRAPHDB%-dist.zip /home/graphdb/
 RUN cd /home/graphdb/ && unzip %GRAPHDB%-dist.zip
 
 # create the init script
+# if you want to maintain consistancy with an existing local user,
+# call "docker run" with final argument "`id -u graphdb` `id -g graphdb`"
 RUN echo '#!/bin/bash' > /home/graphdb/start
-RUN echo '/home/graphdb/%GRAPHDB%/bin/graphdb -Dgraphdb.license.file=/graphdb/graphdb.licence -Dgraphdb.home=/graphdb' >> /home/graphdb/start
-RUN chown graphdb.graphdb /home/graphdb/start
+# get user graphdb uid and gid
+RUN echo 'uid=`id -u graphdb`' >> /home/graphdb/start
+RUN echo 'gid=`id -g graphdb`' >> /home/graphdb/start
+# test if the arguments are empty, keep the current user graphdb uid and gid (i.e. do nothing)
+RUN echo 'if ! [ "$1" = "" -a "$2" = "" ]; then' >> /home/graphdb/start
+# if one of the argument is different from graphdb's uid and gid
+RUN echo '    if [ "$1" != "$uid" -o "$2" != "$gid" ]; then' >> /home/graphdb/start
+RUN echo '       groupmod -g $2 graphdb' >> /home/graphdb/start
+RUN echo '       usermod -u $1 -g $2 graphdb' >> /home/graphdb/start
+RUN echo '    fi' >> /home/graphdb/start
+RUN echo 'fi' >> /home/graphdb/start
+# start graphdb
+RUN echo 'gosu graphdb /home/graphdb/graphdb-se-8.0.3/bin/graphdb -Dgraphdb.license.file=/graphdb/graphdb.license -Dgraphdb.home=/graphdb/graphdb' >> /home/graphdb/start
+
 RUN chmod +x /home/graphdb/start
 
 WORKDIR /home/graphdb
-
-USER graphdb
 
 EXPOSE 7200
 ENTRYPOINT ["/home/graphdb/start"] 

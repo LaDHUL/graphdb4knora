@@ -1,29 +1,42 @@
 # graphdb4knora
-Dockerized GraphDB for knora based on `centos`
+Dockerized GraphDB for knora based on `ubuntu`
 
 We build an off-the shelf graphdb instance (it can be replaced by another anytime)
 
 ## Download graphdb
 
-let's say `graphdb-se-7.1.0-dist.zip`, in the same directory as the Dockerfile.
+let's say `graphdb-se-8.0.3-dist.zip`, in the same directory as the Dockerfile.
 Adapt this script to find your graphdb version:
-```
-cat Dockerfile.prototype | sed 's#%GRAPHDB%#graphdb-se-7.1.0#' > Dockerfile
+```sh
+cat Dockerfile.prototype | sed 's#%GRAPHDB%#graphdb-se-8.0.3#' > Dockerfile
 ```
 
 ## Local data
 
-These items have different lifespan: data, licence, graphdb version, consistency rules file.
-We put the graphdb only in the container, the rest in the host's file system.
+We put only the graphdb code in the container, the rest in the host's file system.  
+These items have different lifespan: _data_, _licence_, graphdb version, _consistency rules file_ ([KnoraRules.pie](https://github.com/dhlab-basel/Knora/blob/develop/webapi/scripts/KnoraRules.pie)).  
+So we expect to have on the host, a local folder like:
 
-The host files system has a directory: `%LOCAL_FS%`, it is mounted with this docker arguments: `-v %LOCAL_FS%:/graphdb`
-
-Adapt this Dockerfile with:
+```sh
+graphdb/
+graphdb.license
+KnoraRules.pie
 ```
-cat Dockerfile | sed 's#%LOCAL_FS%#/my/data/dir#' > Dockerfile
-```
 
-Note about SELinux: if used, selinux has to allow the mount to be writeable by docker:
+
+
+If missing:
+
+- `graphdb/` subfolder is created at runtime
+
+- `graphdb.license`  can be missing, it will generate an error in the log, but graphdb will work without a license
+
+  ​
+
+This local folder (i.e. `/my/data/dir`) is mounted with this docker arguments: `-v /my/data/dir:/graphdb`. 
+
+### Note about SELinux
+
 ```
   $ sudo su -c "setenforce 0"
   $ sudo chcon -Rt svirt_sandbox_file_t </my/data/dir>
@@ -31,16 +44,22 @@ Note about SELinux: if used, selinux has to allow the mount to be writeable by d
   $ sudo mkdir -p </my/data/dir>
 ```
 
-### Licence
-We expect to find a licence file named `%LOCAL_FS%/graphdb.licence`
-
-### PIE file
-Consistency file is also to be copied there: `%LOCAL_FS%/KnoraRules.pie`
-
 # build and run
 
+```sh
+  $ sudo docker build -t graphdb-image .
+  $ sudo docker run -p <exposed port>:7200 -v </my/data/dir>:/graphdb --name graphdb-container -d graphdb-image
 ```
-  $ sudo docker build -t platec/knora-test-graphdb .
-  $ sudo docker run -p <exposed port>:7200 -v </my/data/dir>:/graphdb --name knora-test-graphdb -d platec/knora-test-graphdb
+To ease the release (and roll-back) process, it is recommended to version images and containers, for exemple:
+
+```sh
+  $ sudo docker build -t knora/graphdb:dev-20170613 .
+  $ sudo docker run -p 7200:7200 -v /my/data/dir:/graphdb --name graphdb-20170613 -d knora/graphdb:dev-20170613
+```
+
+To match the rights of the local files and the user graphdb runs as in the container, you can pass a user `uid` and `gid` to be used:
+
+```sh
+$ sudo docker run -p 7200>:7200 -v /my/data/dir:/graphdb --name graphdb-20170613 -d knora/graphdb:dev-20170613 `id -u dbuser` `id -g dbuser`
 ```
 
